@@ -1,0 +1,157 @@
+---
+title: "ds2 hw5"
+author: "Yijing Tao yt2785"
+date: '2022-05-04'
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(mlbench)
+library(ISLR)
+library(caret)
+library(e1071)
+library(kernlab)
+library(tidyverse)
+library(readxl)
+library(factoextra)
+library(gridExtra)
+library(corrplot)
+library(RColorBrewer) 
+library(gplots)
+library(jpeg)
+```
+
+## 1. In this problem, we will apply support vector machines to predict whether a given car gets high or low gas mileage based on the dataset “auto.csv” (used in Homework 3; see Homework 3 for more details of the dataset). The response variable is mpg cat. The predictors are cylinders, displacement, horsepower, weight, acceleration, year, and origin. Split the dataset into two parts: training data (70%) and test data (30%).
+
+```{r}
+auto_df = read_csv("./auto.csv") %>% 
+  data.frame() %>% 
+  na.omit() %>% 
+  mutate(origin = as.factor(origin),
+         mpg_cat = as.factor(mpg_cat))
+
+auto_df2 <- model.matrix(mpg_cat ~ ., auto_df)[ ,-1]
+
+set.seed(2022)
+trainRows <- createDataPartition(auto_df$mpg_cat, p = .7, list = F)
+
+# matrix of predictors (glmnet uses input matrix)
+x1 <- auto_df2[trainRows,]
+# vector of response
+y1 <- auto_df$mpg_cat[trainRows]
+train <- auto_df[trainRows,]
+
+# matrix of predictors (glmnet uses input matrix)
+x2 <- auto_df2[-trainRows,]
+# vector of response
+y2 <- auto_df$mpg_cat[-trainRows]
+test <- auto_df[-trainRows,]
+```
+
+### (a) Fit a support vector classifier (linear kernel) to the training data. What are the training and test error rates?
+
+```{r}
+set.seed(1)
+linear.tune <- tune.svm(mpg_cat ~ . , 
+                        data = train, 
+                        kernel = "linear", 
+                        cost = exp(seq(-6,0,len=100)),
+                        scale = TRUE)
+plot(linear.tune)
+# summary(linear.tune)
+linear.tune$best.parameters
+log(linear.tune$best.parameters)
+
+best.linear <- linear.tune$best.model
+summary(best.linear)
+
+# training error rate
+pred.linear_train <- predict(best.linear, newdata = train)
+
+train_con_matrix <- confusionMatrix(data = pred.linear_train, 
+                reference = y1)
+
+train_err_rate = as.data.frame(1-train_con_matrix$overall[1])[1,]
+
+# test error rate
+pred.linear_test <- predict(best.linear, newdata = test)
+
+test_con_matrix = confusionMatrix(data = pred.linear_test, 
+                reference = y2)
+
+test_err_rate = as.data.frame(1-test_con_matrix$overall[1])[1,]
+```
+The training error rate is `r train_err_rate`and test error rate is `r test_err_rate`.
+
+### (b) Fit a support vector machine with a radial kernel to the training data. What are the training and test error rates?
+
+```{r}
+set.seed(1)
+radial.tune <- tune.svm(mpg_cat ~ . , 
+                        data = train, 
+                        kernel = "radial", 
+                        cost = exp(seq(-1,4,len=20)),
+                        gamma = exp(seq(-6,-2,len=20)))
+
+plot(radial.tune, transform.y = log, transform.x = log, 
+     color.palette = terrain.colors)
+# summary(radial.tune)
+radial.tune$best.parameters
+log(radial.tune$best.parameters)
+
+
+best.radial <- radial.tune$best.model
+summary(best.radial)
+
+# training error rate
+pred.radial_train <- predict(best.radial, newdata = train)
+
+train_con_matrix_ra <- confusionMatrix(data = pred.radial_train, 
+                reference = y1)
+
+train_err_rate_ra = as.data.frame(1-train_con_matrix_ra$overall[1])[1,]
+
+# test error rate
+pred.radial_test <- predict(best.radial, newdata = test)
+
+test_con_matrix_ra = confusionMatrix(data = pred.radial_test, 
+                reference = y2)
+
+test_err_rate_ra = as.data.frame(1-test_con_matrix_ra$overall[1])[1,]
+``` 
+The training error rate is `r train_err_rate_ra`and test error rate is `r test_err_rate_ra`.
+
+## 2. In this problem, we perform hierarchical clustering on the states using the USArrests data in the ISLR package. For each of the 50 states in the United States, the dataset contains the number of arrests per 100,000 residents for each of three crimes: Assault, Murder, and Rape. The dataset also contains the percent of the population in each state living in urban areas, UrbanPop. The four variables will be used as features for clustering.
+
+```{r}
+data(USArrests)
+```
+
+### (a) Using hierarchical clustering with complete linkage and Euclidean distance, cluster the states. Cut the dendrogram at a height that results in three distinct clusters. Which states belong to which clusters?
+
+```{r}
+hc.complete <- hclust(dist(USArrests), method = "complete")
+
+fviz_dend(hc.complete, k = 3,        
+          cex = 0.3, 
+          palette = "jco", 
+          color_labels_by_k = TRUE,
+          rect = TRUE, rect_fill = TRUE, rect_border = "jco",
+          labels_track_height = 2.5)
+
+ind4.complete <- cutree(hc.complete, 3)
+
+
+stat_1_clu <- rownames(USArrests[ind4.complete == 1,])
+stat_2_clu <- rownames(USArrests[ind4.complete == 2,])
+stat_3_clu <- rownames(USArrests[ind4.complete == 3,])
+```
+
+### (b) Hierarchically cluster the states using complete linkage and Euclidean distance, after scaling the variables to have standard deviation one.
+
+```{r}
+
+```
+
+### (c) Does scaling the variables change the clustering results? Why? In your opinion, should the variables be scaled before the inter-observation dissimilarities are computed?
